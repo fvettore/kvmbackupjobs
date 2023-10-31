@@ -41,19 +41,19 @@ Backup target must be mounted before backup starts.
 ## Getting started
 Create your MySQL database. SQL is available in the SQL folder.
 
-Edit config.php accordingly.
+Edit *config.php* accordingly.
 
-Insert your cluster nodes in the nodes table (FQDN or IP).
+Insert your cluster nodes in the *nodes* table (FQDN or IP).
 
-Execute getstatus.php.
+Execute *getstatus.php*.
 
 If the script runs without errors, it should populate the vms table (double check it).
 
-Define a backup job in the backup_jobs table filling the relevant fields (name, max_inc and path).
+Define a backup job in the *backup_jobs* table filling the relevant fields (name, max_inc and path).
 
-Ad VMs in the backup_vms table filling idbackup_jobs (idbackup_job from backup_jobs_table) and idvms (idvms from vms table).
+Ad VMs records in the *backup_vms* table filling *idbackup_jobs* (idbackup_job from backup_jobs_table) and *idvms* (idvms from vms table).
 
-Try to start the job runing the kvmbackupjobs.php and monitor it.
+Try to start the job runing the *kvmbackupjobs.php* and monitor it.
 
 If everything is ok you can add it to cron.
 
