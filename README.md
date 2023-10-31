@@ -53,7 +53,7 @@ Define a backup job in the backup_jobs table filling the relevant fields (name, 
 
 Ad VMs in the backup_vms table filling idbackup_jobs (idbackup_job from backup_jobs_table) and idvms (idvms from vms table).
 
-Tray to start the job runing the kvmbackupjobs.php and monitor it.
+Try to start the job runing the kvmbackupjobs.php and monitor it.
 
 If everything is ok you can add it to cron.
 
