@@ -27,7 +27,7 @@ After the threshold is reached the backup is rotated and a new full instance is 
 
 When backup ends, a detailed report is sent by email.
 
-Checkpoints are saved in the backup folder since, in transitional environments (as pacemaker clusters), when a VM migrate from a node to another, VMs can loose informations about checkpoints.
+Checkpoints are saved in the backup folder since, in transitional environments (as pacemaker clusters), when a VM migrates from a node to another, VM can loose informations about checkpoints.
 (cfr: https://github.com/abbbi/virtnbdbackup/blob/master/README.md#transient-virtual-machines-checkpoint-persistency )
 
 ## Prerequisites
