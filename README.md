@@ -17,7 +17,7 @@ After mapping it scans for all JOBs defined and execute them.
 
 If a prevoius instance of the JOB is still running, the script terminate with email notification.
 
-Otherwise for execute a backup for each VMs defined in the JOB.
+Otherwise a backup for each VMs defined in the JOB is performed.
 
 If the VM have never been backed up, a FULL backup will be performed.
 
