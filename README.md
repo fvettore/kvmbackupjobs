@@ -1,11 +1,13 @@
 # kvmbackupjobs
 Simple script for executing VMs backup jobs on KVM cluster environment
 
-Based on https://github.com/abbbi/virtnbdbackup
+With the latest changed block tracking features from libvirt, create backup JOBs with thin provisioned full and incremental or differential backups of your kvm/qemu virtual machines using the latest changed block tracking features.
 
-Supports incremental backups, backup rotation, VMs migration and checkpoints.
+Supports backup rotation, VMs migration and checkpoints.
 
-Simply add the definition of cluster nodes and backup jobs in mySQL/MariaDB tables and run it (or cron).
+It is based on https://github.com/abbbi/virtnbdbackup
+
+Simply add the definition of cluster nodes and backup jobs in mySQL/MariaDB tables and run it (or cron it).
 No front end yet.
 
 ## How it works
