@@ -9,9 +9,9 @@ Simply add the definition of cluster nodes and backup jobs in mySQL tables and r
 No front end yet.
 
 ## How it works
-The script scan all cluster nodes to map all VMs in the vms table, so it can locate them when executing backup.
+The script scans all cluster nodes to map all VMs in the vms table, so it can locate them when executing backup.
 
-This way a VM migratrion doesn't affect backup operations.
+This way a VM migratrion shouldn't affect backup operations.
 
 After mapping it scans for all JOBs defined and execute them.
 
