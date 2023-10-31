@@ -1,5 +1,5 @@
 # kvmbackupjobs
-Simple script for executing VMs backup jobs backup on KVM cluster environment
+Simple script for executing VMs backup jobs on KVM cluster environment
 
 Based on https://github.com/abbbi/virtnbdbackup
 
