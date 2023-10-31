@@ -57,6 +57,13 @@ Tray to start the job runing the kvmbackupjobs.php and monitor it.
 
 If everything is ok you can add it to cron.
 
+## Retention
+The script is under development. 
+
+After the retention threshold is reached (max number of full backup performed), the older backup folders are deleted.
+
+If a hardened (immutable) backup is set on the storage side (always adviceable!!!!) setup immutability in synch with the above retention thresold otherwise folder cleanup will fail.
+
 
 
 
