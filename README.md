@@ -39,7 +39,7 @@ Backup target must be mounted before backup starts.
 
 
 ## Getting started
-Create yor database. SQL is available in the SQL folder.
+Create your MySQL database. SQL is available in the SQL folder.
 
 Edit config.php accordingly.
 
