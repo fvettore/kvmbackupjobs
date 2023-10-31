@@ -5,7 +5,7 @@ Based on https://github.com/abbbi/virtnbdbackup
 
 Supports incremental backups, backup rotation, VMs migration and checkpoints.
 
-Simply add the definition of cluster nodes and backup jobs in mySQL tables and run it (or cron).
+Simply add the definition of cluster nodes and backup jobs in mySQL/MariaDB tables and run it (or cron).
 No front end yet.
 
 ## How it works
