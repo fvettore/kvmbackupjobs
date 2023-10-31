@@ -17,7 +17,14 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *
 **************************************************************************/
-//Update all cluster VMs status
+<?php
+
+/*****************************************************************************
+ * 
+ * 
+ */
+
+//Update all VMs status
 require_once __DIR__ . "/getstatus.php";
 
 $BACKUPFAIL = FALSE;
@@ -98,64 +105,50 @@ while ($l = $r->fetch_array()) {
             //update array with vms backup data for notification
             $bkres[] = array('vm' => $vms, 'start' => $vmbackupstarted, 'end' => $vmbackupended, 'result' => $result, 'error' => $bkerror, 'type' => $backuptype);
         }
-    }
+    }//backup JOB ended or exited with error
     $db->query("update backup_jobs set lastcompletion=now() where idbackup_jobs=$job_id");
-}
-if (isset($bkres)) {
-    //backup completed
-    if ($BACKUPFAIL) {
-        $color = "red";
-    } else {
-        $color = "green";
-    }
+    if (isset($bkres)) {
+        //backup completed
+        if ($BACKUPFAIL) {
+            $color = "red";
+        } else {
+            $color = "green";
+        }
 
-    $message = "
-    <style>
-
-    table {
-      font-family: Arial, Helvetica, sans-serif;
-      border-collapse: collapse;
-      width: 100%;
-      
-    }
-    table td, th {
-      border: 1px solid #ddd;
-      padding: 8px;
-    }
-    table th {
-      padding-top: 12px;
-      padding-bottom: 12px;
-      text-align: left;
-      background-color: $color;
-      color: white;
-    }
-    </style>    
-    <h3>The following VMs have been backed up</h3>
-    ";
-    $message .= "
-    <table>
-        <tr>
-            <th>VM</th><th>start</th><th>end</th><th>result</th><th>type</th><th>error</th>
-        </tr>
-    ";
-    foreach ($bkres as $vmres) {
-        $message .= "
-        <tr>
-            <td>" . $vmres['vm'] . "</td>
-            <td>" . $vmres['start'] . "</td>
-            <td>" . $vmres['end'] . "</td>
-            <td>" . $vmres['result'] . "</td>            
-            <td>" . $vmres['type'] . "</td>
-            <td>" . $vmres['error'] . "</td>
-        </tr>    
+        $message = "
+        <style>
+        table {font-family: Arial, Helvetica, sans-serif; border-collapse: collapse;width: 100%;}
+        table td, th {border: 1px solid #ddd; padding: 8px;}
+        table th {padding-top: 12px;padding-bottom: 12px;text-align: left;background-color: $color;color: white;}
+        </style>    
+        <h3>The following VMs have been backed up</h3>
         ";
+        $message .= "
+        <table>
+            <tr>
+                <th>VM</th><th>start</th><th>end</th><th>result</th><th>type</th><th>error</th>
+            </tr>
+        ";
+        foreach ($bkres as $vmres) {
+            $message .= "
+            <tr>
+                <td>" . $vmres['vm'] . "</td>
+                <td>" . $vmres['start'] . "</td>
+                <td>" . $vmres['end'] . "</td>
+                <td>" . $vmres['result'] . "</td>            
+                <td>" . $vmres['type'] . "</td>
+                <td>" . $vmres['error'] . "</td>
+            </tr>    
+            ";
+        }
+        $message .= "</table>";
+        emailnotify("Backup $job_name", $message);
+    } else {
+        $message = "<h3>$ERROR</h3>";
+        emailnotify("Backup $job_name FAILED", $message);
     }
-    $message .= "</table>";
-    emailnotify("Backup $job_name", $message);
-} else {
-    $message = "<h3>$ERROR</h3>";
-    emailnotify("Backup $job_name FAILED", $message);
 }
+
 
 function emailnotify($subject, $message)
 {
