@@ -134,7 +134,7 @@ while ($l = $r->fetch_array()) {
             </tr>    
             ";
         }
-        $message .= "</table>";
+        $message = "</table>";
         emailnotify("Backup $job_name", $message);
     } else { //backup aboreted with error
         $message = "<h3>$ERROR</h3>";
