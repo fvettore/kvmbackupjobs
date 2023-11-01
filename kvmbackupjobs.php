@@ -17,13 +17,6 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *
 **************************************************************************/
-<?php
-
-/*****************************************************************************
- * 
- * 
- */
-
 //Update all VMs status
 require_once __DIR__ . "/getstatus.php";
 
@@ -31,6 +24,8 @@ $BACKUPFAIL = FALSE;
 
 $r = $db->query("select * from backup_jobs where enabled=1");
 while ($l = $r->fetch_array()) {
+    $backupres = NULL;
+
     list($job_id, $job_name, $job_max_inc, $job_inc_nr, $job_full_nr, $job_enabled, $job_lastrun, $job_lastcompletion, $job_path) = $l;
 
     if ($job_lastrun > $job_lastcompletion) {
@@ -72,18 +67,20 @@ while ($l = $r->fetch_array()) {
 
             $backupdir = "$job_path/$job_name/$vms";
             echo "performing $backuptype in $backupdir for $vms on node $node\n";
-
+            $vmbackuptype=$backuptype;
             if ($backuptype === 'inc') {
                 //check if preexisting FULL
-                echo "checking existance of FULL in $backupdir/$indir/vda.full.data \n";
-                if (!is_file("$backupdir/$indir/vda.full.data")) {
+                echo "checking existance of FULL in $backupdir/$indir/*.full.data \n";
+                $cmd="ls $backupdir/$indir/*.full.data";
+                passthru($cmd, $result_code);                
+                if ($result_code!=0) {
                     echo "Not prevoius FULL present, performing FULL instead of INC\n";
-                    $backuptype = 'full';
-                }
+                    $vmbackuptype = 'full';
+                } 
             }
 
             $vmbackupstarted = date("Y-m-d H:i:s");
-            $cmd = "/usr/bin/virtnbdbackup -l $backuptype -U qemu+ssh://root@$node/system -d $vms -o  $backupdir/$indir/  --checkpointdir $backupdir/checkpoints";
+            $cmd = "/usr/bin/virtnbdbackup -l $vmbackuptype -U qemu+ssh://root@$node/system -d $vms -o  $backupdir/$indir/  --checkpointdir $backupdir/checkpoints";
             echo "$cmd\n";
             ob_start();
             passthru($cmd . " 2>&1", $result_code);
@@ -103,52 +100,47 @@ while ($l = $r->fetch_array()) {
                 $bkerror = "";
             }
             //update array with vms backup data for notification
-            $bkres[] = array('vm' => $vms, 'start' => $vmbackupstarted, 'end' => $vmbackupended, 'result' => $result, 'error' => $bkerror, 'type' => $backuptype);
+            $bkres[] = array('vm' => $vms, 'start' => $vmbackupstarted, 'end' => $vmbackupended, 'result' => $result, 'error' => $bkerror, 'type' => $vmbackuptype);
+            $db->query("insert into backup_log set vm=\"$vms\", job=\"$job_name\", 
+                 timestart='$vmbackupstarted',timeend='$vmbackupended',result='$result',type='$vmbackuptype'");
         }
-    }//backup JOB ended or exited with error
-    $db->query("update backup_jobs set lastcompletion=now() where idbackup_jobs=$job_id");
-    if (isset($bkres)) {
+    }
+    if (isset($bkres)) { //the backup is complete
+        $db->query("update backup_jobs set lastcompletion=now() where idbackup_jobs=$job_id");
         //backup completed
         if ($BACKUPFAIL) {
             $color = "red";
         } else {
             $color = "green";
         }
-
-        $message = "
-        <style>
-        table {font-family: Arial, Helvetica, sans-serif; border-collapse: collapse;width: 100%;}
-        table td, th {border: 1px solid #ddd; padding: 8px;}
-        table th {padding-top: 12px;padding-bottom: 12px;text-align: left;background-color: $color;color: white;}
-        </style>    
-        <h3>The following VMs have been backed up</h3>
-        ";
+        $thstyle="style=\"padding-top: 12px;padding-bottom: 12px;text-align: left;background-color: $color;color: white;\"";
+        $tdstyle="style=\"border: 1px solid #ddd; padding: 8px;\"";
+        $tablestyle="font-family: Arial, Helvetica, sans-serif; border-collapse: collapse;width: 100%;";
         $message .= "
-        <table>
+        <table $tablestyle>
             <tr>
-                <th>VM</th><th>start</th><th>end</th><th>result</th><th>type</th><th>error</th>
+                <th $thstyle>VM</th><th $thstyle>start</th><th $thstyle>end</th><th $thstyle>result</th><th $thstyle>type</th><th $thstyle>error</th>
             </tr>
         ";
         foreach ($bkres as $vmres) {
             $message .= "
             <tr>
-                <td>" . $vmres['vm'] . "</td>
-                <td>" . $vmres['start'] . "</td>
-                <td>" . $vmres['end'] . "</td>
-                <td>" . $vmres['result'] . "</td>            
-                <td>" . $vmres['type'] . "</td>
-                <td>" . $vmres['error'] . "</td>
+                <td $tdstyle>" . $vmres['vm'] . "</td>
+                <td $tdstyle> " . $vmres['start'] . "</td>
+                <td $tdstyle>" . $vmres['end'] . "</td>
+                <td $tdstyle>" . $vmres['result'] . "</td>            
+                <td $tdstyle>" . $vmres['type'] . "</td>
+                <td $tdstyle>" . $vmres['error'] . "</td>
             </tr>    
             ";
         }
         $message .= "</table>";
         emailnotify("Backup $job_name", $message);
-    } else {
+    } else { //backup aboreted with error
         $message = "<h3>$ERROR</h3>";
         emailnotify("Backup $job_name FAILED", $message);
     }
 }
-
 
 function emailnotify($subject, $message)
 {
