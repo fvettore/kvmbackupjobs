@@ -1,7 +1,7 @@
 # kvmbackupjobs
-Simple script for executing VMs backup jobs on KVM cluster environment
+Simple script for executing VMs backup jobs on KVM cluster environment.
 
-With the latest changed block tracking features from libvirt, create backup JOBs with thin provisioned full and incremental or differential backups of your kvm/qemu virtual machines using the latest changed block tracking features.
+Create backup JOBs with thin provisioned full and incremental or differential backups of your kvm/qemu virtual machines using the latest changed block tracking features.
 
 Supports backup rotation, VMs migration and checkpoints.
 
@@ -35,7 +35,7 @@ Checkpoints are saved in the backup folder since, in transitional environments (
 ## Prerequisites
 All cluster nodes must be set to be accessed by ssh (key, no password) from the host where you are going to run the scripts.
 
-Firewall must be set to enable ssh and nbd.
+Firewall must be set to enable ssh.
 
 Backup target must be mounted before backup starts.
 
@@ -49,7 +49,7 @@ Insert your cluster nodes in the *nodes* table (FQDN or IP).
 
 Execute *getstatus.php*.
 
-If the script runs without errors, it should populate the vms table (double check it).
+If the script runs without errors, it should populate the *vms* table (double check it).
 
 Define a backup job in the *backup_jobs* table filling the relevant fields (name, max_inc and path).
 
@@ -57,14 +57,19 @@ Ad VMs records in the *backup_vms* table filling *idbackup_jobs* (idbackup_job f
 
 Try to start the job runing the *kvmbackupjobs.php* and monitor it.
 
-If everything is ok you can add it to cron.
+If everything is ok you can add it to cron for daily execution.
 
-## Retention
+## Under development
+
+### Day-week selection for jobs
+Will add the ability to plan a job execution only on some days or weeks
+
+### Retention
 The script is under development. 
 
 After the retention threshold is reached (max number of full backup performed), the older backup folders are deleted.
 
-If a hardened (immutable) backup is set on the storage side (always adviceable!!!!) setup immutability in synch with the above retention thresold otherwise folder cleanup will fail.
+If a hardened (immutable) backup is set on the storage side (strongly suggested!!!!) setup immutability in synch with the above retention thresold otherwise folder cleanup will fail.
 
 
 
