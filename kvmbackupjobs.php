@@ -118,7 +118,7 @@ while ($l = $r->fetch_array()) {
         }
         $thstyle="style=\"padding-top: 12px;padding-bottom: 12px;text-align: left;background-color: $color;color: white; border: 1px solid #ddd;padding: 8px;\"";
         $tdstyle="style=\"border: 1px solid #ddd; padding: 8px;\"";
-        $tablestyle="font-family: Arial, Helvetica, sans-serif; border-collapse: collapse;width: 100%;";
+        $tablestyle="style=\"font-family: Arial, Helvetica, sans-serif; border-collapse: collapse;width: 100%;\"";
         $message = "
         <table $tablestyle>
             <tr>
