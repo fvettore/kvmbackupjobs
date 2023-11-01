@@ -20,12 +20,10 @@
 //Update all VMs status
 require_once __DIR__ . "/getstatus.php";
 
-$BACKUPFAIL = FALSE;
-
 $r = $db->query("select * from backup_jobs where enabled=1");
 while ($l = $r->fetch_array()) {
     $backupres = NULL;
-
+    $BACKUPFAIL = FALSE;
     list($job_id, $job_name, $job_max_inc, $job_inc_nr, $job_full_nr, $job_enabled, $job_lastrun, $job_lastcompletion, $job_path) = $l;
 
     if ($job_lastrun > $job_lastcompletion) {
@@ -61,7 +59,8 @@ while ($l = $r->fetch_array()) {
             INNER JOIN
                 nodes n ON n.idnodes = v.idnodes
                 where idbackup_jobs=$job_id");
-
+        //number of objects to be backed-up        
+        $numvms=$r1->num_rows;
         while ($l1 = $r1->fetch_array()) {
             list($vms, $node) = $l1;
 
@@ -70,7 +69,7 @@ while ($l = $r->fetch_array()) {
             $vmbackuptype=$backuptype;
             if ($backuptype === 'inc') {
                 //check if preexisting FULL
-                echo "checking existance of FULL in $backupdir/$indir/*.full.data \n";
+                echo "looking for existance of FULL in $backupdir/$indir/*.full.data \n";
                 $cmd="ls $backupdir/$indir/*.full.data";
                 passthru($cmd, $result_code);                
                 if ($result_code!=0) {
@@ -80,7 +79,7 @@ while ($l = $r->fetch_array()) {
             }
 
             $vmbackupstarted = date("Y-m-d H:i:s");
-            //use different nbd port for each JOB on order to avoid conflicts between jobs
+            //use different NBD port for each JOB on order to avoid conflicts between jobs
             $nbdport=$job_id+10809;
             $cmd = "/usr/bin/virtnbdbackup -P $nbdport -l $vmbackuptype -U qemu+ssh://root@$node/system -d $vms -o  $backupdir/$indir/  --checkpointdir $backupdir/checkpoints";
             echo "$cmd\n";
@@ -108,13 +107,16 @@ while ($l = $r->fetch_array()) {
                  timestart='$vmbackupstarted',timeend='$vmbackupended',result='$result',type='$vmbackuptype',error='$err'");
         }
     }
-    if (isset($bkres)) { //the backup is complete
+    //END OF SINGLE JOB
+    if (isset($bkres)) { //the backup completed
         $db->query("update backup_jobs set lastcompletion=now() where idbackup_jobs=$job_id");
         //backup completed
         if ($BACKUPFAIL) {
             $color = "red";
+            $report="FAIL";
         } else {
             $color = "green";
+            $report="SUCCESS";
         }
         $thstyle="style=\"padding-top: 12px;padding-bottom: 12px;text-align: left;background-color: $color;color: white; border: 1px solid #ddd;padding: 8px;\"";
         $tdstyle="style=\"border: 1px solid #ddd; padding: 8px;\"";
@@ -125,23 +127,24 @@ while ($l = $r->fetch_array()) {
                 <th $thstyle>VM</th><th $thstyle>start</th><th $thstyle>end</th><th $thstyle>result</th><th $thstyle>type</th><th $thstyle>error</th>
             </tr>
         ";
+        if($vmres['result']=='SUCCESS')$rescolor='green';else $rescolor='red';
         foreach ($bkres as $vmres) {
             $message .= "
             <tr>
                 <td $tdstyle>" . $vmres['vm'] . "</td>
                 <td $tdstyle> " . $vmres['start'] . "</td>
                 <td $tdstyle>" . $vmres['end'] . "</td>
-                <td $tdstyle>" . $vmres['result'] . "</td>            
+                <td $tdstyle><span style=\"color:$rescolor;\">". $vmres['result'] . "</span></td>            
                 <td $tdstyle>" . $vmres['type'] . "</td>
                 <td $tdstyle>" . $vmres['error'] . "</td>
             </tr>    
             ";
         }
         $message .= "</table>";
-        emailnotify("Backup $job_name", $message);
+        emailnotify("[$report] Backup $job_name ($numvms objects)", $message);
     } else { //backup aboreted with error
         $message = "<h3>$ERROR</h3>";
-        emailnotify("Backup $job_name FAILED", $message);
+        emailnotify("[$report] Backup $job_name ($numvms objects)", $message);
     }
 }
 
