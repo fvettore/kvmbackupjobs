@@ -74,13 +74,15 @@ while ($l = $r->fetch_array()) {
                 $cmd="ls $backupdir/$indir/*.full.data";
                 passthru($cmd, $result_code);                
                 if ($result_code!=0) {
-                    echo "Not prevoius FULL present, performing FULL instead of INC\n";
+                    echo "Not previous FULL present, performing FULL instead of INC\n";
                     $vmbackuptype = 'full';
                 } 
             }
 
             $vmbackupstarted = date("Y-m-d H:i:s");
-            $cmd = "/usr/bin/virtnbdbackup -l $vmbackuptype -U qemu+ssh://root@$node/system -d $vms -o  $backupdir/$indir/  --checkpointdir $backupdir/checkpoints";
+            //use different nbd port for each JOB on order to avoid conflicts between jobs
+            $nbdport=$job_id+10809;
+            $cmd = "/usr/bin/virtnbdbackup -P $nbdport -l $vmbackuptype -U qemu+ssh://root@$node/system -d $vms -o  $backupdir/$indir/  --checkpointdir $backupdir/checkpoints";
             echo "$cmd\n";
             ob_start();
             passthru($cmd . " 2>&1", $result_code);
@@ -101,8 +103,9 @@ while ($l = $r->fetch_array()) {
             }
             //update array with vms backup data for notification
             $bkres[] = array('vm' => $vms, 'start' => $vmbackupstarted, 'end' => $vmbackupended, 'result' => $result, 'error' => $bkerror, 'type' => $vmbackuptype);
+            $err=$db->real_escape_string($bkerror);
             $db->query("insert into backup_log set vm=\"$vms\", job=\"$job_name\", 
-                 timestart='$vmbackupstarted',timeend='$vmbackupended',result='$result',type='$vmbackuptype'");
+                 timestart='$vmbackupstarted',timeend='$vmbackupended',result='$result',type='$vmbackuptype',error='$err'");
         }
     }
     if (isset($bkres)) { //the backup is complete
@@ -113,10 +116,10 @@ while ($l = $r->fetch_array()) {
         } else {
             $color = "green";
         }
-        $thstyle="style=\"padding-top: 12px;padding-bottom: 12px;text-align: left;background-color: $color;color: white;\"";
+        $thstyle="style=\"padding-top: 12px;padding-bottom: 12px;text-align: left;background-color: $color;color: white; border: 1px solid #ddd;padding: 8px;\"";
         $tdstyle="style=\"border: 1px solid #ddd; padding: 8px;\"";
         $tablestyle="font-family: Arial, Helvetica, sans-serif; border-collapse: collapse;width: 100%;";
-        $message .= "
+        $message = "
         <table $tablestyle>
             <tr>
                 <th $thstyle>VM</th><th $thstyle>start</th><th $thstyle>end</th><th $thstyle>result</th><th $thstyle>type</th><th $thstyle>error</th>
@@ -134,7 +137,7 @@ while ($l = $r->fetch_array()) {
             </tr>    
             ";
         }
-        $message = "</table>";
+        $message .= "</table>";
         emailnotify("Backup $job_name", $message);
     } else { //backup aboreted with error
         $message = "<h3>$ERROR</h3>";
