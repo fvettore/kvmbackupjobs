@@ -1,5 +1,4 @@
 <?php
-
 /**************************************************************************
  *	kvmbackupjobs
  *	© 2023 by Fabrizio Vettore - fabrizio(at)vettore.org
@@ -25,9 +24,24 @@ $r = $db->query("select * from backup_jobs where enabled=1");
 while ($l = $r->fetch_array()) {
     $backupres = NULL;
     $BACKUPFAIL = FALSE;
-    list($job_id, $job_name, $job_max_inc, $job_inc_nr, $job_full_nr, $job_enabled, $job_lastrun, $job_lastcompletion, $job_path) = $l;
+    list($job_id, $job_name, $job_max_inc, $job_inc_nr, $job_full_nr, $job_enabled, $job_lastrun, $job_lastcompletion, $job_path, $job_checkmount) = $l;
 
-    if ($job_lastrun > $job_lastcompletion) {
+    $is_mounted = null;
+    //if checkmount is set, check for mount
+    if ($job_checkmount) {
+        echo "CHECKING mountpoint $job_path... ";        
+        $is_mounted = boolval(trim(shell_exec("mount | grep -c $job_path")));  
+        if($is_mounted){
+            echo "OK!\n";
+        }        
+    }
+    if ($job_checkmount && !$is_mounted) {
+        //JOB already running
+        $BACKUPFAIL = true;
+        $ERROR = "Mountpoint $job_path not mounted";
+        echo "$ERROR\n";
+    }
+    else if ($job_lastrun > $job_lastcompletion) {
         //JOB already running
         $BACKUPFAIL = true;
         $ERROR = "same JOB already running from $job_lastrun";
@@ -82,7 +96,7 @@ while ($l = $r->fetch_array()) {
             $vmbackupstarted = date("Y-m-d H:i:s");
             //use different NBD port for each JOB on order to avoid conflicts between jobs
             $nbdport = $job_id + 10809;
-            $cmd = "/usr/bin/virtnbdbackup -P $nbdport -l $vmbackuptype -U qemu+ssh://root@$node/system -d $vms -o  $backupdir/$indir/  --checkpointdir $backupdir/checkpoints";
+            $cmd = "/usr/bin/virtnbdbackup -P $nbdport -l $vmbackuptype -U qemu+ssh://root@$node/system -d $vms -o  $backupdir/$indir/  --checkpointdir $backupdir/checkpoints";            
             echo "$cmd\n";
             ob_start();
             passthru($cmd . " 2>&1", $result_code);
@@ -125,19 +139,25 @@ while ($l = $r->fetch_array()) {
         $message = "
         <table $tablestyle>
             <tr>
-                <th $thstyle>VM</th><th $thstyle>start</th><th $thstyle>end</th><th $thstyle>result</th><th $thstyle>type</th><th $thstyle>error</th>
+                <th $thstyle>Name</th><th $thstyle>Start time</th><th $thstyle>End time</th><th $thstyle>Status</th><th $thstyle>Type</th><th $thstyle>Duration</th><th $thstyle>Details</th>
             </tr>
         ";
         foreach ($bkres as $vmres) {
+
+            $origin = date_create($vmres['start'] );
+            $target = date_create($vmres['end']);
+            $interval = date_diff($origin, $target);
+
             if ($vmres['result'] == 'SUCCESS') $rescolor = 'green';
             else $rescolor = 'red';
             $message .= "
             <tr>
                 <td $tdstyle>" . $vmres['vm'] . "</td>
                 <td $tdstyle> " . $vmres['start'] . "</td>
-                <td $tdstyle>" . $vmres['end'] . "</td>
+                <td $tdstyle>" . $vmres['end'] . "</td>                
                 <td $tdstyle><span style=\"color:$rescolor;\">" . $vmres['result'] . "</span></td>            
                 <td $tdstyle>" . $vmres['type'] . "</td>
+                <td $tdstyle>".$interval->format("%H:%I:%S")."</td>
                 <td $tdstyle>" . $vmres['error'] . "</td>
             </tr>    
             ";
