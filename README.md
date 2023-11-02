@@ -1,5 +1,5 @@
 # kvmbackupjobs
-Simple script for executing VMs backup jobs on KVM cluster environment.
+Simple script for executing VMs backup jobs on KVM cluster or single host environment.
 
 Create backup JOBs with thin provisioned full and incremental or differential backups of your kvm/qemu virtual machines using the latest changed block tracking features.
 
