@@ -1,4 +1,5 @@
 <?php
+
 /**************************************************************************
  *	kvmbackupjobs
  *	© 2023 by Fabrizio Vettore - fabrizio(at)vettore.org
@@ -27,44 +28,75 @@ while ($l = $r->fetch_array()) {
     list($job_id, $job_name, $job_max_inc, $job_inc_nr, $job_full_nr, $job_enabled, $job_lastrun, $job_lastcompletion, $job_path, $job_checkmount) = $l;
 
     $is_mounted = null;
-    //if checkmount is set, check for mount
-    if ($job_checkmount) {
-        echo "CHECKING mountpoint $job_path... ";        
-        $is_mounted = boolval(trim(shell_exec("mount | grep -c $job_path")));  
-        if($is_mounted){
-            echo "OK!\n";
-        }        
-    }
-    if ($job_checkmount && !$is_mounted) {
-        //JOB already running
-        $BACKUPFAIL = true;
-        $ERROR = "Mountpoint $job_path not mounted";
-        echo "$ERROR\n";
-    }
-    else if ($job_lastrun > $job_lastcompletion) {
-        //JOB already running
-        $BACKUPFAIL = true;
-        $ERROR = "same JOB already running from $job_lastrun";
-        echo "$ERROR\n";
-    } else { //backup can start now 
-        $backupstarted = date("Y-m-d H:i:s");
-        if ($job_inc_nr >= $job_max_inc || $job_full_nr == 0) {
-            $backuptype = 'full';
-            $job_inc_nr = 0;
-            $job_full_nr++;
+    $SKIPBACKUP = FALSE;
+    //check if scheduled for days
+    $d = $db->query("select * from backup_days where idbackup_job=$job_id");
+    if ($d->num_rows) { //a day schedule is defined
+        $days = $d->fetch_array();
+        $curday = dayOfWeek();
+        echo "Checking scheduled for day $curday\n";
+        $is_to_backup = $days[$curday];
+        if ($is_to_backup) {
+            echo "Backup is to be performed on day $curday\n";
         } else {
-            $backuptype = 'inc';
-            $job_inc_nr++;
+            echo "Backup is to be skipped on day $curday\n";
+            $SKIPBACKUP = TRUE;
         }
-        $indir = str_pad($job_full_nr, 6, '0', STR_PAD_LEFT);
-        //get VMs
-        //update Job record
-        $db->query("update backup_jobs set
+    }
+    //check if scheduled weeks
+    if (!$SKIPBACKUP) {
+        $d = $db->query("select * from backup_weeks where idbackup_job=$job_id");
+        if ($d->num_rows) { //a week schedule is defined
+            $weeks = $d->fetch_array();
+            $curweek = WeekOfMonth();
+            echo "Checking scheduled for week $curweek\n";
+            $is_to_backup = $weeks[$curweek];
+            if ($is_to_backup) {
+                echo "Backup is to be performed on week $curweek\n";
+            } else {
+                echo "Backup is to be skipped on week $curweek\n";
+                $SKIPBACKUP = TRUE;
+            }
+        }
+    }    
+    if (!$SKIPBACKUP) {
+        //if checkmount is set, check for mount    
+        if ($job_checkmount) {
+            echo "CHECKING mountpoint $job_path... ";
+            $is_mounted = boolval(trim(shell_exec("mount | grep -c $job_path")));
+            if ($is_mounted) {
+                echo "OK!\n";
+            }
+        }
+        if ($job_checkmount && !$is_mounted) {
+            //JOB already running
+            $BACKUPFAIL = true;
+            $ERROR = "Mountpoint $job_path not mounted";
+            echo "$ERROR\n";
+        } else if ($job_lastrun > $job_lastcompletion) {
+            //JOB already running
+            $BACKUPFAIL = true;
+            $ERROR = "same JOB already running from $job_lastrun";
+            echo "$ERROR\n";
+        } else { //backup can start now 
+            $backupstarted = date("Y-m-d H:i:s");
+            if ($job_inc_nr >= $job_max_inc || $job_full_nr == 0) {
+                $backuptype = 'full';
+                $job_inc_nr = 0;
+                $job_full_nr++;
+            } else {
+                $backuptype = 'inc';
+                $job_inc_nr++;
+            }
+            $indir = str_pad($job_full_nr, 6, '0', STR_PAD_LEFT);
+            //get VMs
+            //update Job record
+            $db->query("update backup_jobs set
                 inc_nr=$job_inc_nr, full_nr=$job_full_nr,
                 lastrun=now()
                 where idbackup_jobs=$job_id");
 
-        $r1 = $db->query("
+            $r1 = $db->query("
         SELECT 
             vm, node
             FROM
@@ -74,100 +106,101 @@ while ($l = $r->fetch_array()) {
             INNER JOIN
                 nodes n ON n.idnodes = v.idnodes
                 where idbackup_jobs=$job_id");
-        //number of objects to be backed-up        
-        $numvms = $r1->num_rows;
-        while ($l1 = $r1->fetch_array()) {
-            list($vms, $node) = $l1;
+            //number of objects to be backed-up        
+            $numvms = $r1->num_rows;
+            while ($l1 = $r1->fetch_array()) {
+                list($vms, $node) = $l1;
 
-            $backupdir = "$job_path/$job_name/$vms";
-            echo "performing $backuptype in $backupdir for $vms on node $node\n";
-            $vmbackuptype = $backuptype;
-            if ($backuptype === 'inc') {
-                //check if preexisting FULL
-                echo "looking for existance of FULL in $backupdir/$indir/*.full.data \n";
-                $cmd = "ls $backupdir/$indir/*.full.data";
-                passthru($cmd, $result_code);
-                if ($result_code != 0) {
-                    echo "Not previous FULL present, performing FULL instead of INC\n";
-                    $vmbackuptype = 'full';
+                $backupdir = "$job_path/$job_name/$vms";
+                echo "performing $backuptype in $backupdir for $vms on node $node\n";
+                $vmbackuptype = $backuptype;
+                if ($backuptype === 'inc') {
+                    //check if preexisting FULL
+                    echo "looking for existance of FULL in $backupdir/$indir/*.full.data \n";
+                    $cmd = "ls $backupdir/$indir/*.full.data";
+                    passthru($cmd, $result_code);
+                    if ($result_code != 0) {
+                        echo "Not previous FULL present, performing FULL instead of INC\n";
+                        $vmbackuptype = 'full';
+                    }
                 }
-            }
 
-            $vmbackupstarted = date("Y-m-d H:i:s");
-            //use different NBD port for each JOB on order to avoid conflicts between jobs
-            $nbdport = $job_id + 10809;
-            $cmd = "/usr/bin/virtnbdbackup -P $nbdport -l $vmbackuptype -U qemu+ssh://root@$node/system -d $vms -o  $backupdir/$indir/  --checkpointdir $backupdir/checkpoints";            
-            echo "$cmd\n";
-            ob_start();
-            passthru($cmd . " 2>&1", $result_code);
-            $var = ob_get_contents();
-            ob_end_clean();
-            $vmbackupended = date("Y-m-d H:i:s");
-            if ($result_code) {
-                //get last row of error message
-                $v = explode("\n", $var);
-                $bkerror = $v[count($v) - 2];
-                echo "error: " . escapeshellcmd($bkerror) . "\n";
-                $result = 'FAIL';
-                $BACKUPFAIL = TRUE;
-            } else {
-                echo "$vms backup success\n";
-                $result = 'SUCCESS';
-                $bkerror = "";
-            }
-            //update array with vms backup data for notification
-            $bkres[] = array('vm' => $vms, 'start' => $vmbackupstarted, 'end' => $vmbackupended, 'result' => $result, 'error' => $bkerror, 'type' => $vmbackuptype);
-            $err = $db->real_escape_string($bkerror);
-            $db->query("insert into backup_log set vm=\"$vms\", job=\"$job_name\", 
+                $vmbackupstarted = date("Y-m-d H:i:s");
+                //use different NBD port for each JOB on order to avoid conflicts between jobs
+                $nbdport = $job_id + 10809;
+                $cmd = "/usr/bin/virtnbdbackup -P $nbdport -l $vmbackuptype -U qemu+ssh://root@$node/system -d $vms -o  $backupdir/$indir/  --checkpointdir $backupdir/checkpoints";
+                echo "$cmd\n";
+                ob_start();
+                passthru($cmd . " 2>&1", $result_code);
+                $var = ob_get_contents();
+                ob_end_clean();
+                $vmbackupended = date("Y-m-d H:i:s");
+                if ($result_code) {
+                    //get last row of error message
+                    $v = explode("\n", $var);
+                    $bkerror = $v[count($v) - 2];
+                    echo "error: " . escapeshellcmd($bkerror) . "\n";
+                    $result = 'FAIL';
+                    $BACKUPFAIL = TRUE;
+                } else {
+                    echo "$vms backup success\n";
+                    $result = 'SUCCESS';
+                    $bkerror = "";
+                }
+                //update array with vms backup data for notification
+                $bkres[] = array('vm' => $vms, 'start' => $vmbackupstarted, 'end' => $vmbackupended, 'result' => $result, 'error' => $bkerror, 'type' => $vmbackuptype);
+                $err = $db->real_escape_string($bkerror);
+                $db->query("insert into backup_log set vm=\"$vms\", job=\"$job_name\", 
                  timestart='$vmbackupstarted',timeend='$vmbackupended',result='$result',type='$vmbackuptype',error='$err'");
+            }
         }
-    }
-    //END OF SINGLE JOB
-    if (isset($bkres)) { //the backup completed
-        $db->query("update backup_jobs set lastcompletion=now() where idbackup_jobs=$job_id");
-        //backup completed
-        if ($BACKUPFAIL) {
-            $color = "red";
-            $report = "FAIL";
-        } else {
-            $color = "green";
-            $report = "SUCCESS";
-        }
-        $thstyle = "style=\"padding-top: 12px;padding-bottom: 12px;text-align: left;background-color: $color;color: white; border: 1px solid #ddd;padding: 8px;\"";
-        $tdstyle = "style=\"border: 1px solid #ddd; padding: 8px;\"";
-        $tablestyle = "style=\"font-family: Arial, Helvetica, sans-serif; border-collapse: collapse;width: 100%;\"";
-        $message = "
+        //END OF SINGLE JOB
+        if (isset($bkres)) { //the backup completed
+            $db->query("update backup_jobs set lastcompletion=now() where idbackup_jobs=$job_id");
+            //backup completed
+            if ($BACKUPFAIL) {
+                $color = "red";
+                $report = "FAIL";
+            } else {
+                $color = "green";
+                $report = "SUCCESS";
+            }
+            $thstyle = "style=\"padding-top: 12px;padding-bottom: 12px;text-align: left;background-color: $color;color: white; border: 1px solid #ddd;padding: 8px;\"";
+            $tdstyle = "style=\"border: 1px solid #ddd; padding: 8px;\"";
+            $tablestyle = "style=\"font-family: Arial, Helvetica, sans-serif; border-collapse: collapse;width: 100%;\"";
+            $message = "
         <table $tablestyle>
             <tr>
                 <th $thstyle>Name</th><th $thstyle>Start time</th><th $thstyle>End time</th><th $thstyle>Status</th><th $thstyle>Type</th><th $thstyle>Duration</th><th $thstyle>Details</th>
             </tr>
         ";
-        foreach ($bkres as $vmres) {
+            foreach ($bkres as $vmres) {
 
-            $origin = date_create($vmres['start'] );
-            $target = date_create($vmres['end']);
-            $interval = date_diff($origin, $target);
+                $origin = date_create($vmres['start']);
+                $target = date_create($vmres['end']);
+                $interval = date_diff($origin, $target);
 
-            if ($vmres['result'] == 'SUCCESS') $rescolor = 'green';
-            else $rescolor = 'red';
-            $message .= "
+                if ($vmres['result'] == 'SUCCESS') $rescolor = 'green';
+                else $rescolor = 'red';
+                $message .= "
             <tr>
                 <td $tdstyle>" . $vmres['vm'] . "</td>
                 <td $tdstyle> " . $vmres['start'] . "</td>
                 <td $tdstyle>" . $vmres['end'] . "</td>                
                 <td $tdstyle><span style=\"color:$rescolor;\">" . $vmres['result'] . "</span></td>            
                 <td $tdstyle>" . $vmres['type'] . "</td>
-                <td $tdstyle>".$interval->format("%H:%I:%S")."</td>
+                <td $tdstyle>" . $interval->format("%H:%I:%S") . "</td>
                 <td $tdstyle>" . $vmres['error'] . "</td>
             </tr>    
             ";
+            }
+            $message .= "</table>";
+            emailnotify("[$report] Backup $job_name ($numvms objects)", $message);
+            unset($bkres);
+        } else { //backup aboreted with error
+            $message = "<h3>$ERROR</h3>";
+            emailnotify("[$report] Backup $job_name ($numvms objects)", $message);
         }
-        $message .= "</table>";
-        emailnotify("[$report] Backup $job_name ($numvms objects)", $message);
-        unset($bkres);
-    } else { //backup aboreted with error
-        $message = "<h3>$ERROR</h3>";
-        emailnotify("[$report] Backup $job_name ($numvms objects)", $message);
     }
 }
 
@@ -184,4 +217,16 @@ Content-Type: text/html; charset=UTF-8
     foreach ($rcpt_to as $recipient) {
         mail($recipient, $subject, $message, $headers, "-f $email_from");
     }
+}
+
+function weekOfMonth()
+{
+    $date = date("Y-m-d");
+    $firstOfMonth = date("Y-m-01", strtotime($date));
+    return (intval(date("W", strtotime($date))) - intval(date("W", strtotime($firstOfMonth))) + 1);
+}
+
+function dayOfWeek()
+{
+    return date("w");
 }
