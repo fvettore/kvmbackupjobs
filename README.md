@@ -5,6 +5,8 @@ Create backup JOBs with thin provisioned full and incremental or differential ba
 
 Supports backup rotation, VMs migration and checkpoints.
 
+Supports for days and weeks schedules.
+
 It is based on https://github.com/abbbi/virtnbdbackup
 
 Simply add the definition of cluster nodes and backup jobs in mySQL/MariaDB tables and run it (or cron it).
@@ -17,7 +19,9 @@ This way a VM migratrion shouldn't affect backup operations.
 
 After mapping it scans for all JOBs defined and execute them.
 
-If a prevoius instance of the JOB is still running, the script terminate with email notification.
+It check for day scheduled and week scheduled an decide if the job is to skipped today. 
+
+If the backup job is not to be skipped, if a prevoius instance is still running, the JOB terminate with email notification.
 
 Otherwise a backup for each VMs defined in the JOB is performed.
 
@@ -60,9 +64,6 @@ Try to start the job runing the *kvmbackupjobs.php* and monitor it.
 If everything is ok you can add it to cron for daily execution.
 
 ## Under development
-
-### Day-week selection for jobs
-Will add the ability to plan a job execution only on some days or weeks
 
 ### Retention
 The script is under development. 
