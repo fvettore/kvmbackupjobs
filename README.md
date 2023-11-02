@@ -51,7 +51,7 @@ Execute *getstatus.php*.
 
 If the script runs without errors, it should populate the *vms* table (double check it).
 
-Define a backup job in the *backup_jobs* table filling the relevant fields (name, max_inc and path).
+Define a backup job in the *backup_jobs* table filling the relevant fields (name, max_inc, enabled and path).
 
 Ad VMs records in the *backup_vms* table filling *idbackup_jobs* (idbackup_job from backup_jobs_table) and *idvms* (idvms from vms table).
 
