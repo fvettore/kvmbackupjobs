@@ -71,11 +71,13 @@ while ($l = $r->fetch_array()) {
         if ($job_checkmount && !$is_mounted) {
             //JOB already running
             $BACKUPFAIL = true;
+            $report="FAIL";
             $ERROR = "Mountpoint $job_path not mounted";
             echo "$ERROR\n";
         } else if ($job_lastrun > $job_lastcompletion) {
             //JOB already running
             $BACKUPFAIL = true;
+            $report="FAIL";
             $ERROR = "same JOB already running from $job_lastrun";
             echo "$ERROR\n";
         } else { //backup can start now 
@@ -151,7 +153,7 @@ while ($l = $r->fetch_array()) {
                 $bkres[] = array('vm' => $vms, 'start' => $vmbackupstarted, 'end' => $vmbackupended, 'result' => $result, 'error' => $bkerror, 'type' => $vmbackuptype);
                 $err = $db->real_escape_string($bkerror);
                 $db->query("insert into backup_log set vm=\"$vms\", job=\"$job_name\", 
-                 timestart='$vmbackupstarted',timeend='$vmbackupended',result='$result',type='$vmbackuptype',error='$err'");
+                 timestart='$vmbackupstarted',timeend='$vmbackupended',result='$result',type='$vmbackuptype',error='$err',path=\" $backupdir/$indir/\"");
             }
         }
         //END OF SINGLE JOB
