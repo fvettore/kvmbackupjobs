@@ -1,6 +1,3 @@
-DROP TABLE IF EXISTS `backup_days`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `backup_days` (
   `idbackup_job` int(11) DEFAULT NULL,
   `1` int(11) DEFAULT NULL,
@@ -13,15 +10,6 @@ CREATE TABLE `backup_days` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `backup_jobs`
---
-
-DROP TABLE IF EXISTS `backup_jobs`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `backup_jobs` (
   `idbackup_jobs` int(11) NOT NULL AUTO_INCREMENT,
   `name` varchar(128) DEFAULT NULL,
@@ -33,17 +21,10 @@ CREATE TABLE `backup_jobs` (
   `lastcompletion` datetime DEFAULT NULL,
   `path` varchar(128) DEFAULT NULL,
   `checkmount` int(11) DEFAULT 0,
+  `retention` int(11) DEFAULT 10 COMMENT 'Number of full backup to retain (no deletion)',
   PRIMARY KEY (`idbackup_jobs`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci COMMENT='                                                     ';
-/*!40101 SET character_set_client = @saved_cs_client */;
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci COMMENT='							';
 
---
--- Table structure for table `backup_log`
---
-
-DROP TABLE IF EXISTS `backup_log`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `backup_log` (
   `idbackup_log` int(11) NOT NULL AUTO_INCREMENT,
   `job` varchar(45) DEFAULT NULL,
@@ -52,36 +33,20 @@ CREATE TABLE `backup_log` (
   `timeend` datetime DEFAULT NULL,
   `type` varchar(6) DEFAULT NULL,
   `result` varchar(20) DEFAULT '0',
+  `path` varchar(255) DEFAULT NULL,
   `error` text DEFAULT NULL,
   PRIMARY KEY (`idbackup_log`)
-) ENGINE=InnoDB AUTO_INCREMENT=115 DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
+) ENGINE=InnoDB AUTO_INCREMENT=143 DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 
---
--- Table structure for table `backup_vms`
---
-
-DROP TABLE IF EXISTS `backup_vms`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `backup_vms` (
   `idbackup_jobs` int(11) DEFAULT NULL,
   `idvms` int(11) DEFAULT NULL,
   `id` int(11) NOT NULL AUTO_INCREMENT,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=22 DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
+) ENGINE=InnoDB AUTO_INCREMENT=25 DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 
---
--- Table structure for table `backup_weeks`
---
-
-DROP TABLE IF EXISTS `backup_weeks`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `backup_weeks` (
   `idbackup_job` int(11) DEFAULT NULL,
-  `week` int(11) DEFAULT NULL,
   `1` int(11) DEFAULT NULL,
   `2` int(11) DEFAULT NULL,
   `3` int(11) DEFAULT NULL,
@@ -90,50 +55,14 @@ CREATE TABLE `backup_weeks` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
 
---
--- Temporary table structure for view `jobs_vms`
---
-
-DROP TABLE IF EXISTS `jobs_vms`;
-/*!50001 DROP VIEW IF EXISTS `jobs_vms`*/;
-SET @saved_cs_client     = @@character_set_client;
-SET character_set_client = utf8;
-/*!50001 CREATE VIEW `jobs_vms` AS SELECT
- 1 AS `vm`,
-  1 AS `node`,
-  1 AS `job_name`,
-  1 AS `max_inc`,
-  1 AS `inc_nr`,
-  1 AS `full_nr`,
-  1 AS `enabled`,
-  1 AS `lastrun`,
-  1 AS `lastcompletion`,
-  1 AS `path` */;
-SET character_set_client = @saved_cs_client;
-
---
--- Table structure for table `nodes`
---
-
-DROP TABLE IF EXISTS `nodes`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `nodes` (
   `idnodes` int(11) NOT NULL AUTO_INCREMENT,
   `node` varchar(45) DEFAULT NULL,
+  `ip` varchar(45) DEFAULT NULL,
   PRIMARY KEY (`idnodes`)
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
 
---
--- Table structure for table `vms`
---
-
-DROP TABLE IF EXISTS `vms`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `vms` (
   `idvms` int(11) NOT NULL AUTO_INCREMENT,
   `id` int(11) DEFAULT NULL,
@@ -142,6 +71,5 @@ CREATE TABLE `vms` (
   `running` int(11) DEFAULT 1,
   `last_seen` datetime DEFAULT NULL,
   PRIMARY KEY (`idvms`)
-) ENGINE=InnoDB AUTO_INCREMENT=19 DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
+) ENGINE=InnoDB AUTO_INCREMENT=23 DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `jobs_vms` AS select `v`.`vm` AS `vm`,`n`.`node` AS `node`,`j`.`name` AS `job_name`,`j`.`max_inc` AS `max_inc`,`j`.`inc_nr` AS `inc_nr`,`j`.`full_nr` AS `full_nr`,`j`.`enabled` AS `enabled`,`j`.`lastrun` AS `lastrun`,`j`.`lastcompletion` AS `lastcompletion`,`j`.`path` AS `path` from (((`backup_jobs` `j` join `backup_vms` `bv` on(`bv`.`idbackup_jobs` = `j`.`idbackup_jobs`)) join `vms` `v` on(`bv`.`idvms` = `v`.`idvms`)) join `nodes` `n` on(`n`.`idnodes` = `v`.`idnodes`)) order by `j`.`name`,`v`.`vm`;
