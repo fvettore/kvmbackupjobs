@@ -1,9 +1,8 @@
 <?php
-
 /**************************************************************************
  *	kvmbackupjobs
  *	© 2023 by Fabrizio Vettore - fabrizio(at)vettore.org
- *	V 0.1
+ *	V 0.2
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
  *    the Free Software Foundation, either version 3 of the License, or
@@ -22,6 +21,7 @@
 require_once __DIR__ . "/getstatus.php";
 
 $r = $db->query("select * from backup_jobs where enabled=1");
+$p=0;//index for increasing MDb port
 while ($l = $r->fetch_array()) {
     $backupres = NULL;
     $BACKUPFAIL = FALSE;
@@ -100,7 +100,7 @@ while ($l = $r->fetch_array()) {
 
             $r1 = $db->query("
         SELECT 
-            vm, node
+            vm, node, ip
             FROM
             backup_vms b
             INNER JOIN
@@ -111,7 +111,7 @@ while ($l = $r->fetch_array()) {
             //number of objects to be backed-up        
             $numvms = $r1->num_rows;
             while ($l1 = $r1->fetch_array()) {
-                list($vms, $node) = $l1;
+                list($vms, $node,$ip) = $l1;
 
                 $backupdir = "$job_path/$job_name/$vms";
                 echo "performing $backuptype in $backupdir for $vms on node $node\n";
@@ -129,9 +129,10 @@ while ($l = $r->fetch_array()) {
 
                 $vmbackupstarted = date("Y-m-d H:i:s");
                 //use different NBD port for each JOB on order to avoid conflicts between jobs
-                $nbdport = $job_id + 10809;
-                $cmd = "/usr/bin/virtnbdbackup -P $nbdport -l $vmbackuptype -U qemu+ssh://root@$node/system -d $vms -o  $backupdir/$indir/  --checkpointdir $backupdir/checkpoints";
-                echo "$cmd\n";
+                $p++;
+                $nbdport = $job_id*100 + 10809+$p;
+                $cmd = "/usr/bin/virtnbdbackup -I $ip -P $nbdport -l $vmbackuptype -U qemu+ssh://root@$ip/system -d $vms -o  $backupdir/$indir/  --checkpointdir $backupdir/checkpoints";
+                echo "$cmd\n";                
                 ob_start();
                 passthru($cmd . " 2>&1", $result_code);
                 $var = ob_get_contents();
@@ -152,8 +153,9 @@ while ($l = $r->fetch_array()) {
                 //update array with vms backup data for notification
                 $bkres[] = array('vm' => $vms, 'start' => $vmbackupstarted, 'end' => $vmbackupended, 'result' => $result, 'error' => $bkerror, 'type' => $vmbackuptype);
                 $err = $db->real_escape_string($bkerror);
-                $db->query("insert into backup_log set vm=\"$vms\", job=\"$job_name\", 
-                 timestart='$vmbackupstarted',timeend='$vmbackupended',result='$result',type='$vmbackuptype',error='$err',path=\" $backupdir/$indir/\"");
+                $qi="insert into backup_log set vm=\"$vms\", job=\"$job_name\", 
+                timestart='$vmbackupstarted',timeend='$vmbackupended',result='$result',type='$vmbackuptype',error='$err',path=\" $backupdir/$indir/\"";
+                $db->query($qi);                
             }
         }
         //END OF SINGLE JOB
