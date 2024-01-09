@@ -131,6 +131,11 @@ while ($l = $r->fetch_array()) {
                 //use different NBD port for each JOB on order to avoid conflicts between jobs
                 $p++;
                 $nbdport = $job_id*100 + 10809+$p;
+                //if FULL backup remove checkpoints
+                if($vmbackuptype==='full'){
+                        $cmd="rm -rf $backupdir/checkpoints/*";
+                        shell_exec($cmd);
+                }
                 $cmd = "/usr/bin/virtnbdbackup -I $ip -P $nbdport -l $vmbackuptype -U qemu+ssh://root@$ip/system -d $vms -o  $backupdir/$indir/  --checkpointdir $backupdir/checkpoints";
                 echo "$cmd\n";                
                 ob_start();
