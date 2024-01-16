@@ -1,8 +1,9 @@
 <?php
+
 /**************************************************************************
  *	kvmbackupjobs
  *	© 2023 by Fabrizio Vettore - fabrizio(at)vettore.org
- *	V 0.2
+ *	V 0.4
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
  *    the Free Software Foundation, either version 3 of the License, or
@@ -20,12 +21,14 @@
 //Update all VMs status
 require_once __DIR__ . "/getstatus.php";
 
-$r = $db->query("select * from backup_jobs where enabled=1");
-$p=0;//index for increasing MDb port
+$qu = "SELECT * FROM backup_jobs WHERE enabled = 1";
+$r = $db->query($qu);
+$p = 0; //index for increasing NDB port
 while ($l = $r->fetch_array()) {
     $backupres = NULL;
     $BACKUPFAIL = FALSE;
-    list($job_id, $job_name, $job_max_inc, $job_inc_nr, $job_full_nr, $job_enabled, $job_lastrun, $job_lastcompletion, $job_path, $job_checkmount) = $l;
+    list($job_id, $job_name, $job_max_inc,  $job_enabled, $job_lastrun, $job_lastcompletion, $job_path, $job_checkmount) = $l;
+
 
     $is_mounted = null;
     $SKIPBACKUP = FALSE;
@@ -58,7 +61,7 @@ while ($l = $r->fetch_array()) {
                 $SKIPBACKUP = TRUE;
             }
         }
-    }    
+    }
     if (!$SKIPBACKUP) {
         //if checkmount is set, check for mount    
         if ($job_checkmount) {
@@ -71,38 +74,28 @@ while ($l = $r->fetch_array()) {
         if ($job_checkmount && !$is_mounted) {
             //JOB already running
             $BACKUPFAIL = true;
-            $report="FAIL";
+            $report = "FAIL";
             $ERROR = "Mountpoint $job_path not mounted";
             echo "$ERROR\n";
         } else if ($job_lastrun > $job_lastcompletion) {
             //JOB already running
             $BACKUPFAIL = true;
-            $report="FAIL";
+            $report = "FAIL";
             $ERROR = "same JOB already running from $job_lastrun";
             echo "$ERROR\n";
         } else { //backup can start now 
+
             $backupstarted = date("Y-m-d H:i:s");
-            if ($job_inc_nr >= $job_max_inc || $job_full_nr == 0) {
-                $backuptype = 'full';
-                $job_inc_nr = 0;
-                $job_full_nr++;
-            } else {
-                $backuptype = 'inc';
-                $job_inc_nr++;
-            }
-            $indir = str_pad($job_full_nr, 6, '0', STR_PAD_LEFT);
-            //get VMs
+
             //update Job record
-            $db->query("update backup_jobs set
-                inc_nr=$job_inc_nr, full_nr=$job_full_nr,
+            $db->query("update backup_jobs set                
                 lastrun=now()
                 where idbackup_jobs=$job_id");
-
             $r1 = $db->query("
-        SELECT 
-            vm, node, ip
+            SELECT 
+                vm, node, ip, inc, full, b.idvms
             FROM
-            backup_vms b
+                backup_vms b
             INNER JOIN
                 vms v ON v.idvms = b.idvms
             INNER JOIN
@@ -111,11 +104,25 @@ while ($l = $r->fetch_array()) {
             //number of objects to be backed-up        
             $numvms = $r1->num_rows;
             while ($l1 = $r1->fetch_array()) {
-                list($vms, $node,$ip) = $l1;
+                list($vms, $node, $ip, $vm_inc, $vm_full, $vms_id) = $l1;
+
+                if ($vm_inc >= $job_max_inc) {
+                    echo "Max INC reached  $vm_inc / $job_max_inc for VM $vms $vms_id\n";
+                    $backuptype = 'full';
+                    $vm_inc = 0;
+                    $vm_full++;
+                } else {
+                    echo "INC $vm_inc / $job_max_inc for VM $vms\n";
+                    $backuptype = 'inc';
+                    $job_inc_nr++;
+                    $vm_inc++;
+                }
+                $indir = str_pad($vm_full, 6, '0', STR_PAD_LEFT);
 
                 $backupdir = "$job_path/$job_name/$vms";
                 echo "performing $backuptype in $backupdir for $vms on node $node\n";
                 $vmbackuptype = $backuptype;
+
                 if ($backuptype === 'inc') {
                     //check if preexisting FULL
                     echo "looking for existance of FULL in $backupdir/$indir/*.full.data \n";
@@ -124,20 +131,22 @@ while ($l = $r->fetch_array()) {
                     if ($result_code != 0) {
                         echo "Not previous FULL present, performing FULL instead of INC\n";
                         $vmbackuptype = 'full';
+                        $vm_inc = 0;
                     }
                 }
+                $db->query("update backup_vms set inc=$vm_inc, full=$vm_full, lastrun=now() where idbackup_jobs=$job_id and idvms=$vms_id ");
+
 
                 $vmbackupstarted = date("Y-m-d H:i:s");
-                //use different NBD port for each JOB on order to avoid conflicts between jobs
+                //use different NBD port for each JOB in order to avoid conflicts between jobs
                 $p++;
-                $nbdport = $job_id*100 + 10809+$p;
-                //if FULL backup remove checkpoints
-                if($vmbackuptype==='full'){
-                        $cmd="rm -rf $backupdir/checkpoints/*";
-                        shell_exec($cmd);
+                $nbdport = $job_id * 100 + 10809 + $p;
+                if ($vmbackuptype === 'full') {
+                    $cmd = "rm -rf $backupdir/checkpoints/*";
+                    shell_exec($cmd);
                 }
                 $cmd = "/usr/bin/virtnbdbackup -I $ip -P $nbdport -l $vmbackuptype -U qemu+ssh://root@$ip/system -d $vms -o  $backupdir/$indir/  --checkpointdir $backupdir/checkpoints";
-                echo "$cmd\n";                
+                echo "$cmd\n";
                 ob_start();
                 passthru($cmd . " 2>&1", $result_code);
                 $var = ob_get_contents();
@@ -150,17 +159,19 @@ while ($l = $r->fetch_array()) {
                     echo "error: " . escapeshellcmd($bkerror) . "\n";
                     $result = 'FAIL';
                     $BACKUPFAIL = TRUE;
+                    $db->query("update backup_vms set success=0 where idbackup_jobs=$job_id and idvms=$vms_id");
                 } else {
                     echo "$vms backup success\n";
                     $result = 'SUCCESS';
                     $bkerror = "";
+                    $db->query("update backup_vms set success=1 where idbackup_jobs=$job_id and idvms=$vms_id");
                 }
                 //update array with vms backup data for notification
                 $bkres[] = array('vm' => $vms, 'start' => $vmbackupstarted, 'end' => $vmbackupended, 'result' => $result, 'error' => $bkerror, 'type' => $vmbackuptype);
                 $err = $db->real_escape_string($bkerror);
-                $qi="insert into backup_log set vm=\"$vms\", job=\"$job_name\", 
-                timestart='$vmbackupstarted',timeend='$vmbackupended',result='$result',type='$vmbackuptype',error='$err',path=\" $backupdir/$indir/\"";
-                $db->query($qi);                
+                $qi = "insert into backup_log set vm=\"$vms\", job=\"$job_name\", 
+                timestart='$vmbackupstarted',timeend='$vmbackupended',result='$result',type='$vmbackuptype',error='$err',path=\" $backupdir/$indir/\",backup_cmd=\"$cmd\" ";
+                $db->query($qi);
             }
         }
         //END OF SINGLE JOB
